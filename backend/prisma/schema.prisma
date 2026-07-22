@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  cycles    Cycle[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // "EMPLOYEE", "MANAGER", "HR"
+  avatar    String?
+
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  managerId String?
+  manager   User?    @relation("ManagerToEmployee", fields: [managerId], references: [id])
+  employees User[]   @relation("ManagerToEmployee")
+
+  evaluationsReceived Evaluation[] @relation("EmployeeEvaluations")
+  evaluationsGiven    Evaluation[] @relation("ManagerEvaluations")
+}
+
+model Cycle {
+  id          String   @id @default(cuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  status      String   // "ACTIVE", "CLOSED"
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  evaluations Evaluation[]
+}
+
+model Evaluation {
+  id          String   @id @default(cuid())
+  cycleId     String
+  cycle       Cycle    @relation(fields: [cycleId], references: [id])
+
+  employeeId  String
+  employee    User     @relation("EmployeeEvaluations", fields: [employeeId], references: [id])
+
+  managerId   String
+  manager     User     @relation("ManagerEvaluations", fields: [managerId], references: [id])
+
+  status      String   // "PENDING", "COMPLETED"
+  overallScore Float?
+  comments    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scores      EvaluationScore[]
+
+  @@unique([cycleId, employeeId]) // One evaluation per employee per cycle
+}
+
+model EvaluationScore {
+  id           String     @id @default(cuid())
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id])
+  parameter    String     // e.g., "Communication", "Technical Skills"
+  score        Int        // 1-5
+  comment      String?
+}
